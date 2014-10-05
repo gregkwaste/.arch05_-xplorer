@@ -71,21 +71,6 @@ Software writen in Python/PyGTK</property>
       <column type="gchararray"/>
     </columns>
   </object>
-  <object class="GtkTextBuffer" id="textbuffer1"/>
-  <object class="GtkTreeStore" id="treestore1">
-    <columns>
-      <!-- column-name Name -->
-      <column type="gchararray"/>
-      <!-- column-name Offset -->
-      <column type="guint"/>
-      <!-- column-name Size -->
-      <column type="guint"/>
-      <!-- column-name ID -->
-      <column type="guint"/>
-      <!-- column-name Path -->
-      <column type="gchararray"/>
-    </columns>
-  </object>
   <object class="GtkWindow" id="window">
     <property name="width_request">1280</property>
     <property name="height_request">720</property>
@@ -232,32 +217,42 @@ Software writen in Python/PyGTK</property>
                 <property name="tab_hborder">7</property>
                 <property name="tab_vborder">0</property>
                 <child>
-                  <object class="GtkTreeView" id="embb_tree">
+                  <object class="GtkScrolledWindow" id="scrolledwindow3">
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
-                    <property name="model">treestore1</property>
-                    <property name="rubber_banding">True</property>
+                    <property name="hscrollbar_policy">automatic</property>
+                    <property name="vscrollbar_policy">automatic</property>
                     <child>
-                      <object class="GtkTreeViewColumn" id="treeviewcolumn2">
-                        <property name="title" translatable="yes">Name</property>
-                        <property name="expand">True</property>
+                      <object class="GtkTreeView" id="embb_tree">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="model">treestore1</property>
+                        <property name="headers_clickable">False</property>
+                        <property name="search_column">0</property>
+                        <property name="rubber_banding">True</property>
                         <child>
-                          <object class="GtkCellRendererText" id="cellrenderertext2"/>
-                          <attributes>
-                            <attribute name="text">0</attribute>
-                          </attributes>
+                          <object class="GtkTreeViewColumn" id="treeviewcolumn2">
+                            <property name="title" translatable="yes">Name</property>
+                            <property name="expand">True</property>
+                            <child>
+                              <object class="GtkCellRendererText" id="cellrenderertext2"/>
+                              <attributes>
+                                <attribute name="text">0</attribute>
+                              </attributes>
+                            </child>
+                          </object>
                         </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkTreeViewColumn" id="treeviewcolumn3">
-                        <property name="title" translatable="yes">Offset</property>
-                        <property name="expand">True</property>
                         <child>
-                          <object class="GtkCellRendererText" id="cellrenderertext3"/>
-                          <attributes>
-                            <attribute name="text">1</attribute>
-                          </attributes>
+                          <object class="GtkTreeViewColumn" id="treeviewcolumn3">
+                            <property name="title" translatable="yes">Offset</property>
+                            <property name="expand">True</property>
+                            <child>
+                              <object class="GtkCellRendererText" id="cellrenderertext3"/>
+                              <attributes>
+                                <attribute name="text">1</attribute>
+                              </attributes>
+                            </child>
+                          </object>
                         </child>
                       </object>
                     </child>
@@ -383,5 +378,20 @@ Software writen in Python/PyGTK</property>
         </child>
       </object>
     </child>
+  </object>
+  <object class="GtkTextBuffer" id="textbuffer1"/>
+  <object class="GtkTreeStore" id="treestore1">
+    <columns>
+      <!-- column-name Name -->
+      <column type="gchararray"/>
+      <!-- column-name Offset -->
+      <column type="guint"/>
+      <!-- column-name Size -->
+      <column type="guint"/>
+      <!-- column-name ID -->
+      <column type="guint"/>
+      <!-- column-name Path -->
+      <column type="gchararray"/>
+    </columns>
   </object>
 </interface>
