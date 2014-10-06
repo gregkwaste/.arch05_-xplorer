@@ -151,6 +151,7 @@ class AppWindow:
             self.context_menu.popup(None,None,None,event.button,event.time)
 
     def load_arch05(self):
+        t=StringIO() #name buffer init
         f=open(self.active_file.path,'rb') #open archive
         #read file
         f.read(4) #LTAR Header
@@ -159,25 +160,16 @@ class AppWindow:
         dir_num=struct.unpack('<I',f.read(4))[0]-1 #descr num???
         file_num=struct.unpack("<I",f.read(4))[0]
         file_names=[]
-        temp=file_num
         print(file_num)
         #get file names
-        f.seek(0x34)#Get to the description start
-        dir=''
-        while (file_num and f.tell()<offset_offset+0x30 and (dir_num>=0)):
-            name=read_string(f)
-            if len(name.split('.'))==1:
-                print(name)
-                dir+=name+'\\'
-                dir_num-=1
-                continue
+        f.seek(0x30)#Get to the description start
+        t.write(f.read(offset_offset))
 
-            file_names.append(dir+name)
-            #print(hex(f.tell()))
-            file_num-=1
-        file_num=temp
+
+
         #return(file_num)
-        f.seek(0x34+offset_offset)
+        t.seek(struct.unpack('<I',f.read(4))[0])
+
         #get file data
         for i in range(file_num):
             offset=struct.unpack('<I',f.read(4))[0]
@@ -185,12 +177,14 @@ class AppWindow:
             comp_size=struct.unpack('<I',f.read(4))[0]
             f.read(4)
             decomp_size=struct.unpack('<I',f.read(4))[0]
-            f.read(4)
-            f.read(8)#skip unudentified data
-            try:
-                self.main_list.append((file_names[i].split('\\')[-1],offset,comp_size,decomp_size,file_names[i]))
-            except:
-                print('Something wrong: ',i)
+            f.read(8)
+            name_offset=struct.unpack('<I',f.read(4))[0]
+            name=read_string(t)
+            t.seek(name_offset)
+
+            self.main_list.append((name,offset,comp_size,decomp_size,name))
+
+
         f.close()
         return len(self.main_list)
 
@@ -212,19 +206,19 @@ class AppWindow:
         f=open(self.active_file.path,'rb')
         f.seek(offset)
         temp_size=0
+        parts=0
         while temp_size<file_comp_size:
             comp_size,decomp_size=struct.unpack('<2I',f.read(8))
             data=f.read(comp_size)
             data=zlib.decompress(data)
             t.write(data)
-
             #Uniform the offset
             off=f.tell() % 4
-            if off:
-                f.read(4-off)
-                #print(f.tell())
+            if off: f.read(4-off)
+            #print(f.tell())
             temp_size+=comp_size+8+(4-off)
-
+            parts+=1
+        print('Total Zlib Chunks: ',hex(parts))
         f.close()
         #read file from memory
         t.seek(0)
@@ -248,7 +242,7 @@ class AppWindow:
         file_num=struct.unpack("<I",self.embb_file.read(4))[0]
 
         file_list=[]
-        print(file_num)
+        #print(file_num)
         temp=file_num
 
         dir=''
