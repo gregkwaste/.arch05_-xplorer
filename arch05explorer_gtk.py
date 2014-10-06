@@ -9,9 +9,13 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-import zlib,os,struct
+import zlib,os,struct,sys
 from StringIO import StringIO
 import gtk,webbrowser
+
+sys.stderr = open('error.log', 'w')
+sys.stdout = open('output.log', 'w')
+
 
 def read_string(f):
     c=''
