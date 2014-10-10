@@ -9,22 +9,22 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-import zlib,os,struct,sys
+import zlib,os,struct,sys,gc
 from StringIO import StringIO
 import gtk,webbrowser
 
-sys.stderr = open('error.log', 'w')
-sys.stdout = open('output.log', 'w')
+#sys.stderr = open('error.log', 'w')
+#sys.stdout = open('output.log', 'w')
 
+def sizeof_fmt(num):
+    for x in ['bytes','KB','MB','GB']:
+        if num < 1024.0:
+            return "%3.1f%s" % (num, x)
+        num /= 1024.0
+    return "%3.1f%s" % (num, 'TB')
 
 def read_string(f):
     c=''
-    temp=struct.unpack('<B', f.read(1))[0]
-    while not temp:
-        temp=struct.unpack('<B',f.read(1))[0]
-        continue
-    if temp:
-        c=chr(temp)
     for i in range(128):
         s = struct.unpack('<B', f.read(1))[0]
         if s == 0:
@@ -51,7 +51,7 @@ class FileChooserWindow(gtk.Window):
 
     def __init__(self):
         self.path = ''
-        self.fcd = gtk.FileChooserDialog("Select Big File", None, gtk.FILE_CHOOSER_ACTION_OPEN,
+        self.fcd = gtk.FileChooserDialog("Select .arch05 File", None, gtk.FILE_CHOOSER_ACTION_OPEN,
                (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK))
         self.response = self.fcd.run()
         if self.response==gtk.RESPONSE_OK:
@@ -61,6 +61,7 @@ class FileChooserWindow(gtk.Window):
         elif self.response == gtk.RESPONSE_CANCEL:
             print("Closing File Dialog")
             self.fcd.destroy()
+            return None
 
 
 class AppWindow:
@@ -77,7 +78,7 @@ class AppWindow:
         self.main_viewer = self.builder.get_object("arch05_tree")
         self.main_viewer.connect("row-activated",self.row_activate)
         #embb list
-        self.embb_list = self.builder.get_object("treestore1")
+        self.embb_list = self.builder.get_object("embb_list")
         self.embb_viewer = self.builder.get_object("embb_tree")
         self.embb_viewer.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
         #xml_text_viewer
@@ -99,15 +100,16 @@ class AppWindow:
         self.hist[0:7]={},{},{},{},{},{},{},{}
 
     def menu_item_response(self,widget,mode):
-        (model,pathlist)=self.embb_viewer.get_selection().get_selected_rows()
-        if mode=="packed_export":
+
+        if mode=="packed_export" and self.embb_viewer.has_focus() :
+            (model,pathlist)=self.embb_viewer.get_selection().get_selected_rows()
             print('I am exporting packed')
 
             for path in pathlist:
                 tree_iter=model.get_iter(path)
                 off=model.get_value(tree_iter,1)
                 size=model.get_value(tree_iter,2)
-                path=model.get_value(tree_iter,4)
+                path=model.get_value(tree_iter,0)
                 self.embb_file.seek(off)
                 if path=='': continue
                 path='C:\\'+path
@@ -118,6 +120,18 @@ class AppWindow:
                 t=open(path,'wb')
                 t.write(self.embb_file.read(size))
                 t.close()
+        elif mode=="packed_export" and self.main_viewer.has_focus():
+            (model,pathlist)=self.main_viewer.get_selection().get_selected_rows()
+            for path in pathlist:
+                tree_iter=model.get_iter(path)
+                name=model.get_value(tree_iter,0)
+                f=open('C:\\'+name,'wb')
+                self.embb_file.seek(0)
+                f.write(self.embb_file.read())
+                f.close()
+
+
+
 
     def clear_hist(self):
         self.hist[0:7]={},{},{},{},{},{},{},{}
@@ -126,9 +140,10 @@ class AppWindow:
         self.clear_hist()
         self.main_list.clear()
         self.active_file=FileChooserWindow()
-        num=self.load_arch05()
-        print("Total Files Detected: ",num)
-        self.status_label.set_label("Current File: "+self.active_file.path)
+        if self.active_file.path:
+            num=self.load_arch05()
+            print("Total Files Detected: ",num)
+            self.status_label.set_label("Current File: "+self.active_file.path)
 
 
     def about_win(self,event):
@@ -161,7 +176,7 @@ class AppWindow:
         f.read(4) #LTAR Header
         f.read(4) #03000000
         offset_offset=struct.unpack('<I',f.read(4))[0]
-        dir_num=struct.unpack('<I',f.read(4))[0]-1 #descr num???
+        dir_num=struct.unpack('<I',f.read(4))[0] #descr num???
         file_num=struct.unpack("<I",f.read(4))[0]
         file_names=[]
         print(file_num)
@@ -176,16 +191,14 @@ class AppWindow:
 
         #get file data
         for i in range(file_num):
-            offset=struct.unpack('<I',f.read(4))[0]
+            #print(f.tell())
+            offset=struct.unpack('<Q',f.read(8))[0]
+            comp_size=struct.unpack('<Q',f.read(8))[0]
+            decomp_size=struct.unpack('<Q',f.read(8))[0]
             f.read(4)
-            comp_size=struct.unpack('<I',f.read(4))[0]
-            f.read(4)
-            decomp_size=struct.unpack('<I',f.read(4))[0]
-            f.read(8)
             name_offset=struct.unpack('<I',f.read(4))[0]
             name=read_string(t)
             t.seek(name_offset)
-
             self.main_list.append((name,offset,comp_size,decomp_size,name))
 
 
@@ -193,15 +206,17 @@ class AppWindow:
         return len(self.main_list)
 
     def row_activate(self,treeview,path,view_column):
+        self.embb_list.clear()
+        gc.collect()
         if self.main_list[path[0]][0].split('.')[-1]=='bndlxml05':
             print('openingxml')
             self.read_xml(self.main_list[path[0]][1],self.main_list[path[0]][2])
             self.notebook.set_page(1)
         elif self.main_list[path[0]][0].split('.')[-1]=='embb':
-            print('openning embb: ',self.main_list[path[0]][0])
-            self.embb_list.clear()
-            self.load_embb(self.main_list[path[0]][1],self.main_list[path[0]][2])
+            #sys.stderr.write('openning embb: ',self.main_list[path[0]][0])
+            num=self.load_embb(self.main_list[path[0]][1],self.main_list[path[0]][2])
             self.notebook.set_page(0)
+            print('Total file read: ',num)
 
 
     def decomp_data(self,offset,file_comp_size):
@@ -212,7 +227,7 @@ class AppWindow:
         temp_size=0
         parts=0
         while temp_size<file_comp_size:
-            comp_size,decomp_size=struct.unpack('<2I',f.read(8))
+            comp_size,decomp_size=struct.unpack('<2L',f.read(8))
             data=f.read(comp_size)
             data=zlib.decompress(data)
             t.write(data)
@@ -237,39 +252,46 @@ class AppWindow:
 
 
     def load_embb(self,offset,file_comp_size):
+        #self.embb_viewer.set_model(None)
         self.embb_file=self.decomp_data(offset,file_comp_size)
         self.embb_file.read(4) #BNDL Header
         self.embb_file.read(4) #04000000
         offset_offset=struct.unpack('<I',self.embb_file.read(4))[0]
         other_offset=struct.unpack('<I',self.embb_file.read(4))[0]
-        self.embb_file.read(8) #000000
+
+        self.embb_file.read(4) #00000000
+        sub_bndls=struct.unpack('<I',self.embb_file.read(4))[0]
         file_num=struct.unpack("<I",self.embb_file.read(4))[0]
 
         file_list=[]
+        sub_bndls_list=[]
+        t=StringIO()
+        t.write(self.embb_file.read(other_offset))
+
         #print(file_num)
-        temp=file_num
+        for i in range(sub_bndls):
+            sub_bndls_list.append(struct.unpack('<I',self.embb_file.read(4))[0])
 
-        dir=''
-        while file_num:
-            name=read_string(self.embb_file)
-            if len(name.split('.'))==1:
-                dir=name+'\\'
-                continue
-            file_list.append(dir+name)
-            file_num-=1
-        file_num=temp
-        self.embb_file.seek(0x1C+other_offset)
 
+        self.file_list=file_list
         tree=self.embb_list
         self.clear_hist()
-        for i in range(file_num):
-            data_id=struct.unpack('<I',self.embb_file.read(4))[0]
-            data_size=struct.unpack('<I',self.embb_file.read(4))[0]
-            data_off=self.embb_file.tell()
-            mps=file_list[i].split('\\')
-            rec_tree(None,mps,0,(data_off,data_size,data_id,file_list[i]),'',tree,self.hist)
-            self.embb_file.seek(data_size,1)
 
+        for i in range(file_num):
+
+            data_name_off=struct.unpack('<L',self.embb_file.read(4))[0]
+            t.seek(data_name_off)
+            data_name=read_string(t)
+            data_size=struct.unpack('<L',self.embb_file.read(4))[0]
+            data_off=self.embb_file.tell()
+            self.embb_list.append((data_name,data_off,data_size,sizeof_fmt(data_size)))
+            file_list.append((data_name,data_off))
+            #mps=file_list[i].split('\\')
+            #rec_tree(None,mps,0,(data_off,data_size,data_id,file_list[i]),'',tree,self.hist)
+            #print(file_list[i],data_off,data_size,data_id)
+            #if i in [5882]:
+            #    print('Problem: ',i, self.embb_file.tell()-8,data_id,data_size,data_off)
+            self.embb_file.seek(data_size,1)
         return file_num
 
 
