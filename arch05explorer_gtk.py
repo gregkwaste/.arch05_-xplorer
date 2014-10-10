@@ -13,8 +13,8 @@ import zlib,os,struct,sys,gc
 from StringIO import StringIO
 import gtk,webbrowser
 
-#sys.stderr = open('error.log', 'w')
-#sys.stdout = open('output.log', 'w')
+sys.stderr = open('error.log', 'w')
+sys.stdout = open('output.log', 'w')
 
 def sizeof_fmt(num):
     for x in ['bytes','KB','MB','GB']:
